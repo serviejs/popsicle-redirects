@@ -22,10 +22,10 @@
   },
   "keywords": [
     "popsicle",
-    "cookies",
-    "jar",
-    "memory",
-    "store"
+    "redirect",
+    "301",
+    "302",
+    "http"
   ],
   "author": {
     "name": "Blake Embrey",
