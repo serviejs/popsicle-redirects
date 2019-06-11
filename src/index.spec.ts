@@ -14,7 +14,13 @@ describe("popsicle redirects", () => {
 
   it("should use cookie store for requests", async () => {
     let i = 0;
-    const spy = jest.fn(async () => i++ === 0 ? redirect.clone() : ok.clone());
+
+    const spy = jest.fn(async req => {
+      if (i++ === 0) return redirect.clone();
+      expect(req.url).toEqual("http://example.com/test");
+      return ok.clone();
+    });
+
     const transport = redirects(spy);
 
     const res = await transport(req.clone(), async () => {
