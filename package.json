@@ -1,6 +1,6 @@
 {
   "name": "popsicle-redirects",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Popsicle middleware for following HTTP redirects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
