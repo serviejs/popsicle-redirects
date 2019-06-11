@@ -54,16 +54,13 @@ export type ConfirmRedirect = <
 /**
  * Middleware function for following HTTP redirects.
  */
-export function redirects<
-  T extends CommonRequest,
-  U extends CommonResponse
->(
+export function redirects<T extends CommonRequest, U extends CommonResponse>(
   fn: (req: T, next: () => Promise<U>) => Promise<U>,
   maxRedirects = 5,
   confirmRedirect: ConfirmRedirect = () => false
 ): (req: T, next: () => Promise<U>) => Promise<U> {
-  return async function(initialRequest, done) {
-    let req = initialRequest.clone();
+  return async function(initReq, done) {
+    let req = initReq.clone();
     let redirectCount = 0;
 
     while (redirectCount++ < maxRedirects) {
@@ -80,9 +77,11 @@ export function redirects<
       req.signal.emit("redirect", newUrl);
 
       if (redirect === REDIRECT_TYPE.FOLLOW_WITH_GET) {
+        const method = initReq.method.toUpperCase() === "HEAD" ? "HEAD" : "GET";
+
         req = req.clone();
-        req.method =
-          initialRequest.method.toUpperCase() === "HEAD" ? "HEAD" : "GET";
+        req.url = newUrl;
+        req.method = method;
         req.$rawBody = null; // Override internal raw body.
 
         // No body will be sent with this redirect.
@@ -96,7 +95,7 @@ export function redirects<
 
         // Following HTTP spec by automatically redirecting with GET/HEAD.
         if (method === "GET" || method === "HEAD") {
-          req = initialRequest.clone();
+          req = initReq.clone();
           req.url = newUrl;
 
           continue;
@@ -104,7 +103,7 @@ export function redirects<
 
         // Allow the user to confirm redirect according to HTTP spec.
         if (confirmRedirect(req, res)) {
-          req = initialRequest.clone();
+          req = initReq.clone();
           req.url = newUrl;
 
           continue;
