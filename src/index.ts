@@ -71,15 +71,14 @@ export function redirects<T extends CommonRequest, U extends CommonResponse>(
 
       const newUrl = resolve(req.url, res.headers.get("Location")!); // tslint:disable-line
 
-      // Ignore the result of the response on redirect.
-      req.signal.emit("abort");
-      req.signal.aborted = false; // Undo aborted state.
+      await res.destroy(); // Ignore the result of the response on redirect.
+
       req.signal.emit("redirect", newUrl);
 
       if (redirect === REDIRECT_TYPE.FOLLOW_WITH_GET) {
         const method = initReq.method.toUpperCase() === "HEAD" ? "HEAD" : "GET";
 
-        req = req.clone();
+        req = initReq.clone();
         req.url = newUrl;
         req.method = method;
         req.$rawBody = null; // Override internal raw body.
@@ -91,12 +90,13 @@ export function redirects<T extends CommonRequest, U extends CommonResponse>(
       }
 
       if (redirect === REDIRECT_TYPE.FOLLOW_WITH_CONFIRMATION) {
-        const method = req.method.toUpperCase();
+        const { method } = req;
 
         // Following HTTP spec by automatically redirecting with GET/HEAD.
-        if (method === "GET" || method === "HEAD") {
+        if (method.toUpperCase() === "GET" || method.toUpperCase() === "HEAD") {
           req = initReq.clone();
           req.url = newUrl;
+          req.method = method;
 
           continue;
         }
@@ -105,6 +105,7 @@ export function redirects<T extends CommonRequest, U extends CommonResponse>(
         if (confirmRedirect(req, res)) {
           req = initReq.clone();
           req.url = newUrl;
+          req.method = method;
 
           continue;
         }
