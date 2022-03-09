@@ -28,6 +28,40 @@ describe("popsicle redirects", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
+  it("should resolve based on request url", async () => {
+    const spy = jest.fn(async (req: Request) => {
+      if (spy.mock.calls.length === 1) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: "http://foobar.com",
+          },
+        });
+      }
+
+      if (spy.mock.calls.length === 2) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: "/test",
+          },
+        });
+      }
+
+      expect(req.url).toEqual("http://foobar.com/test");
+      return new Response(null, { status: 200 });
+    });
+
+    const transport = redirects(spy);
+
+    const res = await transport(new Request("http://example.com"), async () => {
+      throw new TypeError("Unexpected response");
+    });
+
+    expect(res.status).toEqual(200);
+    expect(spy).toHaveBeenCalledTimes(3);
+  });
+
   describe("secure headers", () => {
     const headers = {
       cookie: "example_cookie",
@@ -92,6 +126,45 @@ describe("popsicle redirects", () => {
 
       expect(res.status).toEqual(200);
       expect(spy).toHaveBeenCalledTimes(2);
+    });
+
+    it("should discard cookies when off the original host", async () => {
+      const spy = jest.fn(async (req: Request) => {
+        if (spy.mock.calls.length === 1) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: "https://example.com",
+            },
+          });
+        }
+
+        if (spy.mock.calls.length === 2) {
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: "/test",
+            },
+          });
+        }
+
+        expect(req.url).toEqual("https://example.com/test");
+        expect(req.headers.get("Cookie")).toBe(null);
+        expect(req.headers.get("Authorization")).toBe(null);
+        return new Response(null, { status: 200 });
+      });
+
+      const transport = redirects(spy);
+
+      const res = await transport(
+        new Request("http://example.com", { headers }),
+        async () => {
+          throw new TypeError("Unexpected response");
+        }
+      );
+
+      expect(res.status).toEqual(200);
+      expect(spy).toHaveBeenCalledTimes(3);
     });
   });
 });

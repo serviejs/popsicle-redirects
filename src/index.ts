@@ -43,28 +43,26 @@ export class MaxRedirectsError extends Error {
 /**
  * Create a new request object and tidy up any loose ends to avoid leaking info.
  */
-function safeRedirect<T>(
-  request: CommonRequest<T>,
-  location: string,
-  method: string
-) {
-  const originalUrl = new URL(request.url);
-  const newUrl = new URL(location, originalUrl);
+function safeRedirect<T>(initReq: CommonRequest<T>) {
+  const originalUrl = new URL(initReq.url);
 
-  const url = newUrl.toString();
-  request.signal.emit("redirect", url);
+  return (req: CommonRequest<T>, location: string, method: string) => {
+    const newUrl = new URL(location, req.url);
 
-  const newRequest = request.clone();
-  newRequest.url = url;
-  newRequest.method = method;
+    req.signal.emit("redirect", newUrl.toString());
 
-  // Delete cookie header when leaving the original URL.
-  if (originalUrl.origin !== newUrl.origin) {
-    newRequest.headers.delete("cookie");
-    newRequest.headers.delete("authorization");
-  }
+    const newRequest = initReq.clone();
+    newRequest.url = newUrl.toString();
+    newRequest.method = method;
 
-  return newRequest;
+    // Delete cookie header when leaving the original URL.
+    if (newUrl.origin !== originalUrl.origin) {
+      newRequest.headers.delete("cookie");
+      newRequest.headers.delete("authorization");
+    }
+
+    return newRequest;
+  };
 }
 
 /**
@@ -87,6 +85,7 @@ export function redirects<T extends CommonRequest, U extends CommonResponse>(
   confirmRedirect: ConfirmRedirect = () => false
 ): (req: T, next: () => Promise<U>) => Promise<U> {
   return async function (initReq, done) {
+    const safeClone = safeRedirect(initReq);
     let req = initReq.clone();
     let redirectCount = 0;
 
@@ -102,7 +101,7 @@ export function redirects<T extends CommonRequest, U extends CommonResponse>(
       if (redirect === REDIRECT_TYPE.FOLLOW_WITH_GET) {
         const method = initReq.method.toUpperCase() === "HEAD" ? "HEAD" : "GET";
 
-        req = safeRedirect(initReq, location, method);
+        req = safeClone(req, location, method);
         req.$rawBody = null; // Override internal raw body.
         req.headers.set("Content-Length", "0");
 
@@ -114,14 +113,14 @@ export function redirects<T extends CommonRequest, U extends CommonResponse>(
 
         // Following HTTP spec by automatically redirecting with GET/HEAD.
         if (method.toUpperCase() === "GET" || method.toUpperCase() === "HEAD") {
-          req = safeRedirect(initReq, location, method);
+          req = safeClone(req, location, method);
 
           continue;
         }
 
         // Allow the user to confirm redirect according to HTTP spec.
         if (confirmRedirect(req, res)) {
-          req = safeRedirect(initReq, location, method);
+          req = safeClone(req, location, method);
 
           continue;
         }
