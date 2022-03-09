@@ -15,7 +15,7 @@ declare module "servie/dist/signal" {
  */
 enum REDIRECT_TYPE {
   FOLLOW_WITH_GET,
-  FOLLOW_WITH_CONFIRMATION
+  FOLLOW_WITH_CONFIRMATION,
 }
 
 /**
@@ -26,7 +26,7 @@ const REDIRECT_STATUS: { [status: number]: number | undefined } = {
   "302": REDIRECT_TYPE.FOLLOW_WITH_GET,
   "303": REDIRECT_TYPE.FOLLOW_WITH_GET,
   "307": REDIRECT_TYPE.FOLLOW_WITH_CONFIRMATION,
-  "308": REDIRECT_TYPE.FOLLOW_WITH_CONFIRMATION
+  "308": REDIRECT_TYPE.FOLLOW_WITH_CONFIRMATION,
 };
 
 /**
@@ -59,7 +59,7 @@ export function redirects<T extends CommonRequest, U extends CommonResponse>(
   maxRedirects = 5,
   confirmRedirect: ConfirmRedirect = () => false
 ): (req: T, next: () => Promise<U>) => Promise<U> {
-  return async function(initReq, done) {
+  return async function (initReq, done) {
     let req = initReq.clone();
     let redirectCount = 0;
 

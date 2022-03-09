@@ -1,5 +1,6 @@
-import { redirects } from "./index";
+import { jest, expect, describe } from "@jest/globals";
 import { Request, Response } from "servie/dist/node";
+import { redirects } from "./index";
 
 describe("popsicle redirects", () => {
   const req = new Request("http://example.com/");
@@ -8,14 +9,14 @@ describe("popsicle redirects", () => {
   const redirect = new Response(null, {
     status: 302,
     headers: {
-      Location: "/test"
-    }
+      Location: "/test",
+    },
   });
 
-  it("should use cookie store for requests", async () => {
+  it("should follow 302 redirect", async () => {
     let i = 0;
 
-    const spy = jest.fn(async req => {
+    const spy = jest.fn(async (req: Request) => {
       if (i++ === 0) return redirect.clone();
       expect(req.url).toEqual("http://example.com/test");
       return ok.clone();
