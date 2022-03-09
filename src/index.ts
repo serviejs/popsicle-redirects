@@ -1,4 +1,4 @@
-import { resolve } from "url";
+import { URL } from "url";
 import { CommonRequest, CommonResponse } from "servie/dist/common";
 
 /**
@@ -6,7 +6,7 @@ import { CommonRequest, CommonResponse } from "servie/dist/common";
  */
 declare module "servie/dist/signal" {
   export interface SignalEvents {
-    redirect: [string];
+    redirect: [URL];
   }
 }
 
@@ -41,6 +41,32 @@ export class MaxRedirectsError extends Error {
 }
 
 /**
+ * Create a new request object and tidy up any loose ends to avoid leaking info.
+ */
+function safeRedirect<T>(
+  request: CommonRequest<T>,
+  location: string,
+  method: string
+) {
+  const originalUrl = new URL(request.url);
+  const newUrl = new URL(location, originalUrl);
+
+  request.signal.emit("redirect", newUrl);
+
+  const newRequest = request.clone();
+  newRequest.url = newUrl.toString();
+  newRequest.method = method;
+
+  // Delete cookie header when leaving the original URL.
+  if (originalUrl.origin !== newUrl.origin) {
+    newRequest.headers.delete("cookie");
+    newRequest.headers.delete("authorization");
+  }
+
+  return newRequest;
+}
+
+/**
  * Redirect confirmation function.
  */
 export type ConfirmRedirect = <
@@ -66,24 +92,17 @@ export function redirects<T extends CommonRequest, U extends CommonResponse>(
     while (redirectCount++ < maxRedirects) {
       const res = await fn(req as T, done);
       const redirect = REDIRECT_STATUS[res.status];
+      const location = res.headers.get("Location");
 
-      if (redirect === undefined || !res.headers.has("Location")) return res;
-
-      const newUrl = resolve(req.url, res.headers.get("Location")!); // tslint:disable-line
+      if (redirect === undefined || !location) return res;
 
       await res.destroy(); // Ignore the result of the response on redirect.
-
-      req.signal.emit("redirect", newUrl);
 
       if (redirect === REDIRECT_TYPE.FOLLOW_WITH_GET) {
         const method = initReq.method.toUpperCase() === "HEAD" ? "HEAD" : "GET";
 
-        req = initReq.clone();
-        req.url = newUrl;
-        req.method = method;
+        req = safeRedirect(initReq, location, method);
         req.$rawBody = null; // Override internal raw body.
-
-        // No body will be sent with this redirect.
         req.headers.set("Content-Length", "0");
 
         continue;
@@ -94,18 +113,14 @@ export function redirects<T extends CommonRequest, U extends CommonResponse>(
 
         // Following HTTP spec by automatically redirecting with GET/HEAD.
         if (method.toUpperCase() === "GET" || method.toUpperCase() === "HEAD") {
-          req = initReq.clone();
-          req.url = newUrl;
-          req.method = method;
+          req = safeRedirect(initReq, location, method);
 
           continue;
         }
 
         // Allow the user to confirm redirect according to HTTP spec.
         if (confirmRedirect(req, res)) {
-          req = initReq.clone();
-          req.url = newUrl;
-          req.method = method;
+          req = safeRedirect(initReq, location, method);
 
           continue;
         }
