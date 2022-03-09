@@ -6,7 +6,7 @@ import { CommonRequest, CommonResponse } from "servie/dist/common";
  */
 declare module "servie/dist/signal" {
   export interface SignalEvents {
-    redirect: [URL];
+    redirect: [string];
   }
 }
 
@@ -51,10 +51,11 @@ function safeRedirect<T>(
   const originalUrl = new URL(request.url);
   const newUrl = new URL(location, originalUrl);
 
-  request.signal.emit("redirect", newUrl);
+  const url = newUrl.toString();
+  request.signal.emit("redirect", url);
 
   const newRequest = request.clone();
-  newRequest.url = newUrl.toString();
+  newRequest.url = url;
   newRequest.method = method;
 
   // Delete cookie header when leaving the original URL.
